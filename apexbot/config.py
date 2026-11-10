@@ -25,6 +25,8 @@ DEFAULTS = {
     "max_daily_loss_pct": 10.0,  # kunlik zarar balansning shu foizidan oshsa bot to'xtaydi
     "dry_balance": 1000.0,       # dry rejimda Binance'ga ulanib bo'lmasa ishlatiladigan shartli balans
     "notify": "me",
+    # Boshqa kanallardan nusxalash (python -m apexbot.setup_forwarder bilan sozlanadi)
+    "forwarder": {"enabled": False, "sources": [], "request_join": "", "destination": ""},
 }
 
 
@@ -63,6 +65,9 @@ def validate(cfg: dict) -> None:
         raise ValueError("tp_split yig'indisi 100 bo'lsin")
     if cfg["margin_type"] not in ("ISOLATED", "CROSSED"):
         raise ValueError("margin_type: ISOLATED yoki CROSSED")
+    fwd = cfg.get("forwarder") or {}
+    if fwd.get("enabled") and not (fwd.get("sources") and fwd.get("destination")):
+        raise ValueError("forwarder yoqilgan, lekin sources yoki destination yo'q")
 
 
 def secret(name: str) -> str:

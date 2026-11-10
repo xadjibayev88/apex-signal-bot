@@ -9,3 +9,4 @@ STOP.done
 __pycache__/
 .pytest_cache/
 bot.lock
+message_map.sqlite3

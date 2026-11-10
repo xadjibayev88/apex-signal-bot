@@ -111,6 +111,14 @@ async def run() -> None:
     await client.start()
     if live:
         await asyncio.to_thread(x.sync_time)
+    fwd = cfg.get("forwarder") or {}
+    if fwd.get("enabled"):
+        from . import forwarder
+        try:
+            lines = await forwarder.attach(client, fwd, ROOT / "message_map.sqlite3")
+        except Exception as e:  # noqa: BLE001 — nusxalash ulanmasa ham signal boti ishlayversin
+            lines = [f"nusxalash ulanmadi ({type(e).__name__})"]
+        await notify("🔁 Nusxalash:\n" + "\n".join(lines))
     await notify(f"🤖 Apex signal bot ishga tushdi. Rejim: {'REAL' if live else 'DRY-RUN (pul ishlatilmaydi)'}. Kanal: {', '.join(cfg['channels'])}")
     asyncio.get_running_loop().create_task(watch_stop_file())
     await client.run_until_disconnected()

@@ -36,6 +36,17 @@ va telefon sozlamalarida Termux uchun batareya tejash o'chirilsin.
 
 Telegram ishlamasa: Termux'da bot papkasida `touch STOP` — xuddi `/stop` kabi ishlaydi.
 
+## Boshqa kanallardan nusxalash (ixtiyoriy)
+Bot signal kuzatish bilan birga, siz a'zo bo'lgan manba kanallardagi **yangi** xabarlarni o'z kanalingizga nusxalashi
+ham mumkin (forward emas; javoblar mos ota xabarga ulanadi; himoyalangan postlar tashlab ketiladi). Ikkalasi bitta
+Telegram ulanishida ishlaydi, shuning uchun alohida skript va alohida sessiya kerak emas.
+```
+python -m apexbot.setup_forwarder    # havolalar va manzil kanalni so'raydi, settings.json ga yozadi
+./run.sh
+```
+Havolalar faqat telefondagi `settings.json` da turadi. O'chirish: `setup_forwarder` ni ishga tushirib, birinchi savolga bo'sh Enter.
+Eski javob bog'lanishlarini saqlash uchun: `cp ~/telegram-forwarder/telegram_message_map.sqlite3 message_map.sqlite3`.
+
 ## Sozlamalar (`settings.json`)
 | Kalit | Ma'nosi | Standart |
 |---|---|---|
