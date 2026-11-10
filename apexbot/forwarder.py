@@ -43,6 +43,31 @@ class MessageMapStore:
         self.connection.close()
 
 
+AD_WORDS = re.compile(
+    r"раздач|розыгрыш|конкурс|бонус|промокод|реферал|партн[её]р|регистрир|регистрац|депозит|giveaway|airdrop|"
+    r"bingx|bybit|okx|mexc|bitget|kucoin|gate\.io|подпис(ывай|аться|ка)|переходи|жми|kazino|казино|ставк[аи] на", re.I)
+URL_RE = re.compile(r"(?:https?://|www\.|t\.me/)\S+", re.I)
+CTA_LINE = re.compile(r"открыть сделку|открыть позицию|торговать здесь|ссылка|регистрац", re.I)
+
+
+def clean_signal_text(text: str) -> str:
+    """Signal matnidan begona havola/CTA satrlarini olib tashlaydi ("➡️ Открыть сделку" va h.k.)."""
+    lines = [ln for ln in text.splitlines() if not CTA_LINE.search(ln) and not URL_RE.search(ln)]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
+def ad_reason(text: str, has_link_entities: bool = False, has_buttons: bool = False) -> str | None:
+    """Reklama bo'lsa sababini qaytaradi, aks holda None. Signal xabarlari bu yerga kelmaydi (ular tozalab nusxalanadi)."""
+    m = AD_WORDS.search(text or "")
+    if m:
+        return f"reklama so'zi: {m.group(0).lower()}"
+    if URL_RE.search(text or "") or has_link_entities:
+        return "tashqi havola"
+    if has_buttons:
+        return "havolali tugma"
+    return None
+
+
 def invite_hash_from_link(link: str) -> str:
     match = re.search(r"(?:t\.me/\+|t\.me/joinchat/)([A-Za-z0-9_-]+)", link)
     if not match:
@@ -80,9 +105,11 @@ async def resolve_source(client, link: str, submit_join_request: bool):
 
 
 async def copy_message(client, destination, message, source_chat_id: int, source_title: str,
-                       store: MessageMapStore, chat_protected: bool = False):
+                       store: MessageMapStore, chat_protected: bool = False, block_ads: bool = False):
     """Bitta xabarni nusxalaydi. Qaytaradi: manzil xabar ID yoki None (tashlab ketilgan)."""
     from telethon import errors, types
+
+    from .parser import SignalError, parse_signal
 
     mid = message.id
     if chat_protected or getattr(message, "noforwards", False):
@@ -96,6 +123,19 @@ async def copy_message(client, destination, message, source_chat_id: int, source
             log.info("Javob id=%s (%s): ota xabar nusxalanmagan, tashlab ketildi", mid, source_title)
             return None
     text, entities, media = message.message or "", message.entities or None, message.media
+    if block_ads:
+        try:
+            is_signal = parse_signal(text) is not None
+        except SignalError:
+            is_signal = True  # chala signal ham signal: tozalab o'tkazamiz
+        if is_signal:  # signal qoladi, ichidagi begona havola va "Открыть сделку" satri olib tashlanadi
+            text, entities = clean_signal_text(text), None
+        else:
+            links = any(type(e).__name__ in ("MessageEntityTextUrl", "MessageEntityUrl") for e in (entities or []))
+            reason = ad_reason(text, links, bool(getattr(message, "reply_markup", None)))
+            if reason:
+                log.info("Reklama filtri: id=%s (%s) o'tkazilmadi (%s)", mid, source_title, reason)
+                return None
 
     async def send():
         if media and not isinstance(media, types.MessageMediaWebPage):
@@ -164,9 +204,11 @@ async def attach(client, fcfg: dict, db_path: Path) -> list[str]:
         log.info("Yangi xabar id=%s (%s, media=%s)", event.message.id, title, media)
         async with lock:
             await copy_message(client, destination, event.message, event.chat_id, title, store,
-                               chat_protected=bool(getattr(chat, "noforwards", False)))
+                               chat_protected=bool(getattr(chat, "noforwards", False)),
+                               block_ads=bool(fcfg.get("block_ads", True)))
 
     for src in sources:
         client.add_event_handler(on_new, events.NewMessage(chats=src))
-    report.append(f"nusxalash yoqildi: {len(sources)} manba -> manzil kanal")
+    report.append(f"nusxalash yoqildi: {len(sources)} manba -> manzil kanal"
+                  + (" (reklama filtri yoqilgan)" if fcfg.get("block_ads", True) else ""))
     return report

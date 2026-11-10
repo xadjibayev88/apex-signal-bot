@@ -4,7 +4,7 @@ from types import SimpleNamespace as NS
 import pytest
 from telethon import errors, types
 
-from apexbot.forwarder import MessageMapStore, copy_message, invite_hash_from_link
+from apexbot.forwarder import MessageMapStore, ad_reason, clean_signal_text, copy_message, invite_hash_from_link
 
 
 class FakeClient:
@@ -23,7 +23,7 @@ class FakeClient:
 
 
 def msg(mid, text="salom", media=None, reply_to=None, noforwards=False):
-    return NS(id=mid, message=text, entities=None, media=media, noforwards=noforwards,
+    return NS(id=mid, message=text, entities=None, media=media, noforwards=noforwards, reply_markup=None,
               reply_to=NS(reply_to_msg_id=reply_to) if reply_to else None)
 
 
@@ -78,3 +78,31 @@ def test_flood_wait_retries_once_and_rpc_error_skips(store, monkeypatch):
 
 def test_empty_message_skipped(store):
     assert run(copy_message(FakeClient(), "dest", msg(1, text=""), -100, "A", store)) is None
+
+
+JTO = "📈 JTO LONG плечо x25\n\nТочка входа: рынок (0.3388)\n\nТаргет 1: 0.3423\nТаргет 2: 0.3474\n\nСтоп: 0.3202\n\n➡️ Открыть сделку"
+
+
+@pytest.mark.parametrize("text", [
+    "🫴МАССОВАЯ РАЗДАЧА 2000 USDT для МОЕЙ АУДИТОРИИ", "500$ от BINGX💰 на торговый счет😊",
+    "Регистрируйся по ссылке", "Новости: https://example.com/abc", "Бонус на депозит",
+])
+def test_ads_detected(text):
+    assert ad_reason(text)
+
+
+@pytest.mark.parametrize("text", ["Всем привет 🤝", "Открыл сделку в лонг с 20 плечом по GRASS и JTO", "Bitcoin va stavka masalasi: bozor nima kutmoqda"])
+def test_normal_posts_pass(text):
+    assert ad_reason(text) is None
+
+
+def test_ad_skipped_and_signal_copied_without_cta_line(store):
+    c = FakeClient()
+    assert run(copy_message(c, "dest", msg(1, text="500$ от BINGX💰"), -100, "A", store, block_ads=True)) is None
+    assert run(copy_message(c, "dest", msg(2, text=JTO), -100, "A", store, block_ads=True)) == 101
+    assert "Открыть сделку" not in c.sent[0][1] and "Стоп: 0.3202" in c.sent[0][1]
+    assert run(copy_message(c, "dest", msg(3, text="500$ от BINGX💰"), -100, "A", store, block_ads=False)) == 102
+
+
+def test_clean_signal_text():
+    assert clean_signal_text(JTO).endswith("Стоп: 0.3202")
