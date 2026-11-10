@@ -39,6 +39,7 @@ async def run() -> None:
     cfg = load_settings()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s",
                         handlers=[logging.FileHandler(ROOT / "bot.log", encoding="utf-8"), logging.StreamHandler()])
+    logging.getLogger("telethon").setLevel(logging.ERROR)  # qayta ulanish haqidagi mayda xabarlar ekranni to'ldirmasin
     live = is_live(cfg)
     x = Binance(secret("BINANCE_API_KEY"), secret("BINANCE_API_SECRET"), cfg["testnet"]) if live else Binance(testnet=cfg["testnet"])
     state = State(ROOT / "state.json")
