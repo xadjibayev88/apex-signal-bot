@@ -1,0 +1,10 @@
+.env
+settings.json
+session*
+state.json
+state.tmp
+*.log
+STOP
+STOP.done
+__pycache__/
+.pytest_cache/

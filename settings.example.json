@@ -1,0 +1,18 @@
+{
+  "channels": ["@Apex_Trader_Uz"],
+  "mode": "dry",
+  "live_confirm": "",
+  "testnet": false,
+  "min_rr": 2.0,
+  "size_mode": "margin_pct",
+  "size_pct": 5.0,
+  "leverage": 5,
+  "max_leverage": 10,
+  "margin_type": "ISOLATED",
+  "tp_split": [50, 30, 20],
+  "max_positions": 3,
+  "entry_tolerance_pct": 0.5,
+  "max_daily_loss_pct": 10.0,
+  "dry_balance": 1000.0,
+  "notify": "me"
+}
