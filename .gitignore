@@ -8,3 +8,4 @@ STOP
 STOP.done
 __pycache__/
 .pytest_cache/
+bot.lock

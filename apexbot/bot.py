@@ -116,8 +116,25 @@ async def run() -> None:
     await client.run_until_disconnected()
 
 
+def single_instance():
+    """Bir vaqtda faqat bitta bot: ikkinchisi sessiya faylini qulflab qo'yadi ("database is locked")."""
+    import fcntl
+
+    handle = open(ROOT / "bot.lock", "w")
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        print("Bot allaqachon ishlayapti (boshqa oynada yoki fonda). Bu nusxa ishga tushmadi.")
+        raise SystemExit(3)
+    return handle  # jarayon tugaguncha ochiq turadi
+
+
 def main() -> None:
-    asyncio.run(run())
+    lock = single_instance()
+    try:
+        asyncio.run(run())
+    finally:
+        lock.close()
 
 
 if __name__ == "__main__":
