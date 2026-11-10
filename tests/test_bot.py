@@ -166,3 +166,10 @@ def test_daily_loss_limit_pauses(tmp_path):
 def test_state_dedup_survives_restart(tmp_path):
     s = State(tmp_path / "s.json"); s.mark("1:10")
     assert State(tmp_path / "s.json").seen("1:10")
+
+
+def test_market_entry_numbered_targets_format_ignores_leverage():
+    s = parse_signal("📈 JTO LONG плечо x25\n\nТочка входа: рынок (0.3388)\n\nТаргет 1: 0.3423\nТаргет 2: 0.3474\nТаргет 3: 0.3620\n\nСтоп: 0.3202\n\nМоя маржа: 700$\nБанк марафона: 7545.14$")
+    assert (s.symbol, s.side, s.entry, s.stop, s.targets) == ("JTOUSDT", "LONG", 0.3388, 0.3202, (0.3423, 0.3474, 0.362))
+    assert parse_signal("Открыл сделку в лонг с 20 плечом по GRASS и JTO") is None
+    assert parse_signal("BTC LONG pozitsiyalar bugun foydada") is None

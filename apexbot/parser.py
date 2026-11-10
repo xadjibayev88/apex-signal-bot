@@ -31,13 +31,19 @@ def parse_signal(text: str) -> Signal | None:
     """
     if not text:
         return None
-    head = re.search(r"\$([A-Z0-9]{2,15})\s*(?:->|→|—|-|:)?\s*(LONG|SHORT)\b", text, re.I)
+    # sarlavha: "$MASK -> LONG" yoki "📈 JTO LONG плечо x25" (xabardagi leverage ataylab o'qilmaydi)
+    head = re.search(r"^\W*\$?([A-Z0-9]{2,15})\s*(?:->|→|—|-|:)?\s*(LONG|SHORT)\b", text, re.I | re.M)
     if not head:
         return None
     ticker, side = head.group(1).upper(), head.group(2).upper()
-    entry = re.search(r"Точка\s+входа\s*:\s*" + NUM, text, re.I)
+    entry = re.search(r"Точка\s+входа\s*:[^\d\n]*" + NUM, text, re.I)   # "0.3743" yoki "рынок (0.3388)"
+    numbered = re.findall(r"Таргет\s*\d+\s*:\s*" + NUM, text, re.I)      # "Таргет 1: 0.3423" qatorlari
     targets = re.search(r"Таргеты?\s*:\s*([\d.,\s]+)", text, re.I)
+    if numbered:
+        targets = re.match(r"(.*)", ", ".join(numbered))
     stop = re.search(r"Стоп\s*:\s*" + NUM, text, re.I)
+    if not (entry or targets or stop):
+        return None  # "BTC LONG pozitsiyalar foydada" kabi oddiy matn: signal emas
     if not (entry and targets and stop):
         raise SignalError("signal to'liq emas (entry/target/stop yetishmaydi)")
     # "0.3781, 0.3820" -> vergul+bo'shliq ajratuvchi; "0,3781" o'nli vergul bo'lishi ham mumkin
