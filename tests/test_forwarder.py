@@ -49,12 +49,20 @@ def test_text_copied_and_reply_linked_to_copied_parent(store):
     assert c.sent[1] == ("text", "salom", 101)
 
 
-def test_reply_to_uncopied_parent_and_protected_are_skipped(store):
+def test_protected_skipped_and_reply_to_uncopied_parent_copied_without_link(store):
     c = FakeClient()
-    assert run(copy_message(c, "dest", msg(5, reply_to=4), -100, "A", store)) is None
     assert run(copy_message(c, "dest", msg(6, noforwards=True), -100, "A", store)) is None
     assert run(copy_message(c, "dest", msg(7), -100, "A", store, chat_protected=True)) is None
     assert c.sent == []
+    assert run(copy_message(c, "dest", msg(5, reply_to=4), -100, "A", store)) == 101
+    assert c.sent[0][2] is None  # ota xabar yo'q: javobsiz nusxalanadi
+
+
+def test_rejected_entities_fall_back_to_plain_text(store):
+    c = FakeClient(fail=[errors.EntityBoundsInvalidError(request=None)])
+    m = msg(8)
+    m.entities = [NS()]
+    assert run(copy_message(c, "dest", m, -100, "A", store)) == 101
 
 
 def test_media_sent_as_file_and_webpage_as_text(store):

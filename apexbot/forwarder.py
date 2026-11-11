@@ -119,9 +119,8 @@ async def copy_message(client, destination, message, source_chat_id: int, source
     reply_to = getattr(getattr(message, "reply_to", None), "reply_to_msg_id", None)
     if reply_to is not None:
         parent = store.get(source_chat_id, reply_to)
-        if parent is None:
-            log.info("Javob id=%s (%s): ota xabar nusxalanmagan, tashlab ketildi", mid, source_title)
-            return None
+        if parent is None:  # ota xabar nusxalanmagan: natija postlari yo'qolmasligi uchun javobsiz nusxalaymiz
+            log.info("Javob id=%s (%s): ota xabar nusxalanmagan, javob bog'lanishisiz nusxalanadi", mid, source_title)
     text, entities, media = message.message or "", message.entities or None, message.media
     if block_ads:
         try:
@@ -137,23 +136,37 @@ async def copy_message(client, destination, message, source_chat_id: int, source
                 log.info("Reklama filtri: id=%s (%s) o'tkazilmadi (%s)", mid, source_title, reason)
                 return None
 
-    async def send():
+    async def send(ents=entities):
         if media and not isinstance(media, types.MessageMediaWebPage):
-            return await client.send_file(destination, media, caption=text, formatting_entities=entities, reply_to=parent)
+            return await client.send_file(destination, media, caption=text, formatting_entities=ents, reply_to=parent)
         if not text:
             return None
-        return await client.send_message(destination, text, formatting_entities=entities, reply_to=parent, link_preview=True)
+        return await client.send_message(destination, text, formatting_entities=ents, reply_to=parent, link_preview=True)
+
+    async def send_safely():
+        """Bezakli matn (maxsus emoji va h.k.) rad etilsa, oddiy matn bilan qayta yuboradi."""
+        try:
+            return await send()
+        except errors.FloodWaitError:
+            raise
+        except errors.ChatForwardsRestrictedError:
+            raise
+        except errors.RPCError as e:
+            if not entities:
+                raise
+            log.info("Bezakli matn rad etildi (%s): id=%s oddiy matn bilan qayta yuboriladi", type(e).__name__, mid)
+            return await send(None)
 
     try:
         try:
-            copied = await send()
+            copied = await send_safely()
         except errors.FloodWaitError as e:  # Telegram "sekinroq" desa kutib, bir marta qayta urinamiz
             if e.seconds > MAX_FLOOD_WAIT:
                 log.warning("FloodWait %ss, xabar id=%s (%s) tashlab ketildi", e.seconds, mid, source_title)
                 return None
             log.info("FloodWait: %ss kutilmoqda", e.seconds)
             await asyncio.sleep(e.seconds + 1)
-            copied = await send()
+            copied = await send_safely()
     except errors.ChatForwardsRestrictedError:
         log.warning("Telegram nusxalashni taqiqlaydi: id=%s (%s)", mid, source_title)
         return None
